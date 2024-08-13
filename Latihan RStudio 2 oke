@@ -1,0 +1,84 @@
+library(tidyverse)
+library(readxl)
+library(ggpubr)
+library(agricolae)
+library(rsm)
+##................Membaca Data.....................##
+contohral1<-read_xlsx('datalatihan.xlsx', sheetName = 'RAL Polinomial')
+contohral2<-read_excel('datalatihan.xlsx', sheet = 'RAL Polinomial')
+contohral2
+head(contohral2)
+
+contohral2%>%
+  filter(dosis==0.5)%>%
+  select(produksi, tt)%>%
+  mutate(perkalian=tt*produksi,
+         akar=perkalian^0.5)
+         
+contohral2%>%
+  ggplot(aes(x=dosis, y=produksi))+
+  geom_point()+
+  geom_smooth(method = 'lm', formula = y~I(x)+I(x^2), se=F, color='steelblue')+
+  stat_regline_equation(formula = y~I(x)+I(x^2), aes(label=..eq.label..), label.y =37)
+
+
+
+
+##......................RAL..............................##
+contohral2
+str(contohral2)
+contohral2<-contohral2%>%
+  mutate(dosis=as.factor(dosis))
+
+anovaral2<-aov(produksi~dosis, data=contohral2)
+summary(anovaral2)
+
+library(nortest)
+lillie.test(anovaral2$residuals)  
+
+library(car)
+leveneTest(anovaral2)
+leveneTest(produksi~dosis, data=contohral2)
+
+contohral2<-contohral2%>%
+  mutate(tproduksi=sqrt(produksi))
+
+library(agricolae)
+lanjut.lsd<-LSD.test(anovaral2,'dosis')
+lanjut.lsd
+lanjut.duncan<-duncan.test(anovaral2,'dosis')
+lanjut.duncan
+lanjut.bnj<-HSD.test(anovaral2, 'dosis') 
+
+library(DescTools)
+DunnettTest(contohral2$produksi, contohral2$dosis, contol = '1.5')
+
+lanjut.duncan$groups%>%
+  rownames_to_column('dosis')%>%
+  ggplot(aes(x=dosis, y=produksi))+
+  geom_bar(stat='identity', width=0.7, color='black', fill='white')+
+  geom_text(aes(label = groups), vjust=-1)+
+  geom_text(aes(label = round(produksi,2)), vjust=-2.5)+
+  scale_y_continuous(limits =c(0,45))+
+  theme_bw()
+  
+  ##......................Uji Lanjut Ortogonal Polimonial.......................##
+summary(anovaral2)
+str(contohral2)
+contrasts(contohral2$dosis)<-contr.poly(5)  
+str(contohral2)  
+sidikragampolinomial<-aov(produksi~dosis, data=contohral2)              
+summary(sidikragampolinomial)             
+summary.aov(sidikragampolinomial, split=list(dosis=list('Linier'=1,
+                                                        'kuadrat'=2,
+                                                        'kubik'=3,
+                                                        'kuatrik'=4)))
+contohral2%>%
+  mutate(dosis=as.numeric(as.character(dosis)))%>%
+  ggplot(aes(x=dosis, y=produksi))+
+  geom_point()+
+  geom_smooth(method = 'lm', formula = y~I(x)+I(x^2), se=T, color='steelblue')+
+  stat_regline_equation(formula = y~I(x)+I(x^2), aes(label=..eq.label..), label.y =37)+
+  labs(x='Dosis (kg)', y=produksi (Ton)')+
+  theme_bw()
+  
